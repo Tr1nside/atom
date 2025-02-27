@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Браузерная IDE с интерактивной консолью</title>
+
+  <!-- CodeMirror CSS (светлая и тёмная тема) -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/codemirror.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/theme/dracula.min.css">
+
+  <style>
+    body {
+      margin: 20px;
+      font-family: sans-serif;
+      transition: background-color 0.3s, color 0.3s;
+    }
+    .CodeMirror {
+      border: 1px solid #ddd;
+      height: auto;
+    }
+    #console {
+      width: 100%;
+      height: 300px;
+      background: #f5f5f5;
+      padding: 10px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      border: 1px solid #ccc;
+      transition: background-color 0.3s, color 0.3s;
+    }
+    body.dark {
+      background-color: #2b2b2b;
+      color: #ccc;
+    }
+    body.dark #console {
+      background-color: #333;
+      color: #ccc;
+      border-color: #666;
+    }
+    .btn {
+      padding: 6px 12px;
+      margin-right: 10px;
+      cursor: pointer;
+    }
+    .btn:focus {
+      outline: none;
+    }
+    #consoleInput {
+      width: 100%;
+      box-sizing: border-box;
+    }
+  </style>
+</head>
+<body>
+  <h2>Браузерная IDE с интерактивным вводом</h2>
+  <button class="btn" onclick="toggleTheme()">Тёмная/Светлая тема</button>
+  <button class="btn" onclick="executeCode()">Выполнить</button>
+  <br><br>
+
+  <textarea id="codeInput" rows="10" cols="60">
+# Пример с интерактивным вводом
+name = input("Как тебя зовут? ")
+print("Привет,", name)
+  </textarea>
+
+  <h3>Консоль:</h3>
+  <div id="console"></div>
+
+  <!-- Поле для ввода в консоль (появляется при запросе input()) -->
+  <input type="text" id="consoleInput" placeholder="Введите значение и нажмите Enter" onkeypress="handleConsoleKeyPress(event)" style="display: none;">
+
+  <!-- Socket.IO -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.4/socket.io.min.js"></script>
+  <!-- CodeMirror и режим Python -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/codemirror.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/mode/python/python.min.js"></script>
+
+  <script>
+    const socket = io();
+
+    // Инициализация CodeMirror без горячих клавиш
+    let editor = CodeMirror.fromTextArea(document.getElementById('codeInput'), {
+      lineNumbers: true,
+      mode: "python",
+      theme: "default"
+    });
+
+    // Переключение темы
+    let darkMode = false;
+    function toggleTheme() {
+      darkMode = !darkMode;
+      document.body.classList.toggle("dark", darkMode);
+      editor.setOption("theme", darkMode ? "dracula" : "default");
+    }
+
+    // Запуск кода по кнопке "Выполнить"
+    function executeCode() {
+      clearConsole();
+      const code = editor.getValue();
+      socket.emit('execute', code);
+    }
+
+    // Очистка консоли
+    function clearConsole() {
+      document.getElementById("console").innerText = "";
+      document.getElementById("consoleInput").style.display = "none";
+    }
+
+    // Функция для добавления текста в консоль
+    function appendToConsole(text) {
+      const consoleDiv = document.getElementById("console");
+      consoleDiv.innerText += text;
+      consoleDiv.scrollTop = consoleDiv.scrollHeight;
+    }
+
+    // Обработка события вывода из сервера
+    socket.on('console_output', (data) => {
+      appendToConsole(data + "\n");
+      // Если это приглашение к вводу, показываем поле ввода
+      document.getElementById("consoleInput").style.display = "block";
+      document.getElementById("consoleInput").focus();
+    });
+
+    // Обработка ввода в консоли
+    function handleConsoleKeyPress(event) {
+      if (event.key === "Enter") {
+        const inputField = event.target;
+        const value = inputField.value;
+        socket.emit('console_input', value);
+        appendToConsole(value + "\n");
+        inputField.value = "";
+        inputField.style.display = "none";
+        event.preventDefault();
+      }
+    }
+  </script>
+</body>
+</html>
